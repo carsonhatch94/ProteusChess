@@ -279,6 +279,7 @@
 /* ---- Legend ---- */
 .legend {
     margin-top: 1rem;
+    margin-bottom: 1rem;
     text-align: left;
     background: #fafafa;
     border: 1px solid #ddd;

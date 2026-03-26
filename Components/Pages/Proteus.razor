@@ -1,4 +1,4 @@
-@page "/proteus"
+Ôªø@page "/proteus"
 @page "/"
 @rendermode InteractiveServer
 @using ProteusChess.Models
@@ -38,25 +38,6 @@
     <div class="status-bar">
         <span class="status-message @StatusClass">@_game.StatusMessage</span>
     </div>
-
-    @if (_game.Phase == TurnPhase.Rotate && _game.SelectedSquare != null && !_game.IsGameOver)
-    {
-        var (sr, sc) = _game.SelectedSquare.Value;
-        var selectedDie = _game.Board[sr, sc];
-        if (selectedDie != null)
-        {
-            <div class="rotate-controls">
-                <span class="rotate-label">Rotate <img class="rotate-label-img" src="@selectedDie.ImagePath" alt="@selectedDie.Type" /> <strong>@selectedDie.Type</strong>:</span>
-                <button class="rotate-btn up" disabled="@(!selectedDie.CanRotateUp)" @onclick="OnRotateUp">
-                    Up to @RotateUpName(selectedDie)
-                </button>
-                <button class="rotate-btn down" disabled="@(!selectedDie.CanRotateDown)" @onclick="OnRotateDown">
-                    Down to @RotateDownName(selectedDie)
-                </button>
-                <button class="rotate-btn cancel" @onclick="CancelRotateSelection">? Different piece</button>
-            </div>
-        }
-    }
 
     <div class="board-wrapper">
         <div class="board-container">
@@ -102,14 +83,33 @@
     <div class="legend">
         <h3>Piece Reference</h3>
         <div class="legend-grid">
-            <div class="legend-item"><img class="legend-img" src="/images/pieces/wC.svg" alt="Pyramid" /> Pyramid ó cannot move or be captured (0 pts)</div>
-            <div class="legend-item"><img class="legend-img" src="/images/pieces/wP.svg" alt="Pawn" /> Pawn ó 1 forward, captures diagonally (2 pts)</div>
-            <div class="legend-item"><img class="legend-img" src="/images/pieces/wB.svg" alt="Bishop" /> Bishop ó diagonal slides (3 pts)</div>
-            <div class="legend-item"><img class="legend-img" src="/images/pieces/wN.svg" alt="Knight" /> Knight ó L-shaped jumps (4 pts)</div>
-            <div class="legend-item"><img class="legend-img" src="/images/pieces/wR.svg" alt="Rook" /> Rook ó straight slides (5 pts)</div>
-            <div class="legend-item"><img class="legend-img" src="/images/pieces/wQ.svg" alt="Queen" /> Queen ó any direction, backstab vulnerability! (6 pts)</div>
+            <div class="legend-item"><img class="legend-img" src="/images/pieces/wC.svg" alt="Pyramid" /> Pyramid ‚Äî cannot move or be captured (0 pts)</div>
+            <div class="legend-item"><img class="legend-img" src="/images/pieces/wP.svg" alt="Pawn" /> Pawn ‚Äî 1 forward, captures diagonally (2 pts)</div>
+            <div class="legend-item"><img class="legend-img" src="/images/pieces/wB.svg" alt="Bishop" /> Bishop ‚Äî diagonal slides (3 pts)</div>
+            <div class="legend-item"><img class="legend-img" src="/images/pieces/wN.svg" alt="Knight" /> Knight ‚Äî L-shaped jumps (4 pts)</div>
+            <div class="legend-item"><img class="legend-img" src="/images/pieces/wR.svg" alt="Rook" /> Rook ‚Äî straight slides (5 pts)</div>
+            <div class="legend-item"><img class="legend-img" src="/images/pieces/wQ.svg" alt="Queen" /> Queen ‚Äî any direction, backstab vulnerability! (6 pts)</div>
         </div>
     </div>
+
+    @if (_game.Phase == TurnPhase.Rotate && _game.SelectedSquare != null && !_game.IsGameOver)
+    {
+        var (sr, sc) = _game.SelectedSquare.Value;
+        var selectedDie = _game.Board[sr, sc];
+        if (selectedDie != null)
+        {
+            <div class="rotate-controls">
+                <span class="rotate-label">Rotate <img class="rotate-label-img" src="@selectedDie.ImagePath" alt="@selectedDie.Type" /> <strong>@selectedDie.Type</strong>:</span>
+                <button class="rotate-btn up" disabled="@(!selectedDie.CanRotateUp)" @onclick="OnRotateUp">
+                    ‚¨ÜÔ∏è Up to @RotateUpName(selectedDie)
+                </button>
+                <button class="rotate-btn down" disabled="@(!selectedDie.CanRotateDown)" @onclick="OnRotateDown">
+                    ‚¨áÔ∏è Down to @RotateDownName(selectedDie)
+                </button>
+                <button class="rotate-btn cancel" @onclick="CancelRotateSelection">‚úñ Different piece</button>
+            </div>
+        }
+    }
 
     <p class="instructions">
         <strong>Each turn:</strong> Move a piece, then rotate a <em>different</em> piece one step up or down &bull;
@@ -187,8 +187,8 @@
     }
 
     private string RotateUpName(Die die) =>
-        die.CanRotateUp ? ((PieceType)((int)die.Type + 1)).ToString() : "ó";
+        die.CanRotateUp ? ((PieceType)((int)die.Type + 1)).ToString() : "‚Äî";
 
     private string RotateDownName(Die die) =>
-        die.CanRotateDown ? ((PieceType)((int)die.Type - 1)).ToString() : "ó";
+        die.CanRotateDown ? ((PieceType)((int)die.Type - 1)).ToString() : "‚Äî";
 }
