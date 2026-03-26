@@ -48,12 +48,12 @@
             <div class="rotate-controls">
                 <span class="rotate-label">Rotate <img class="rotate-label-img" src="@selectedDie.ImagePath" alt="@selectedDie.Type" /> <strong>@selectedDie.Type</strong>:</span>
                 <button class="rotate-btn up" disabled="@(!selectedDie.CanRotateUp)" @onclick="OnRotateUp">
-                    ? Up to @RotateUpName(selectedDie)
+                    Up to @RotateUpName(selectedDie)
                 </button>
                 <button class="rotate-btn down" disabled="@(!selectedDie.CanRotateDown)" @onclick="OnRotateDown">
-                    ? Down to @RotateDownName(selectedDie)
+                    Down to @RotateDownName(selectedDie)
                 </button>
-                <button class="rotate-btn cancel" @onclick="CancelRotateSelection">? Different die</button>
+                <button class="rotate-btn cancel" @onclick="CancelRotateSelection">Different die</button>
             </div>
         }
     }
