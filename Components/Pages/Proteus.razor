@@ -1,0 +1,186 @@
+@page "/proteus"
+@page "/"
+@rendermode InteractiveServer
+@using ProteusChess.Models
+
+<PageTitle>Proteus Chess</PageTitle>
+
+<div class="proteus-container">
+    <h1>Proteus Chess</h1>
+
+    <div class="controls">
+        <button class="new-game-btn" @onclick="NewGame">New Game</button>
+    </div>
+
+    <div class="score-bar">
+        <div class="score white-score">
+            <span class="score-label">White:</span>
+            <span class="score-value">@_game.WhiteScore pts</span>
+            <span class="captured-pieces">
+                @foreach (var d in _game.WhiteCaptured)
+                {
+                    <img class="captured-die-img" src="@d.ImagePath" alt="@d.Type" title="@d.Type (@d.PointValue pts)" />
+                }
+            </span>
+        </div>
+        <div class="score black-score">
+            <span class="score-label">Black:</span>
+            <span class="score-value">@_game.BlackScore pts</span>
+            <span class="captured-pieces">
+                @foreach (var d in _game.BlackCaptured)
+                {
+                    <img class="captured-die-img" src="@d.ImagePath" alt="@d.Type" title="@d.Type (@d.PointValue pts)" />
+                }
+            </span>
+        </div>
+    </div>
+
+    <div class="status-bar">
+        <span class="status-message @StatusClass">@_game.StatusMessage</span>
+    </div>
+
+    @if (_game.Phase == TurnPhase.Rotate && _game.SelectedSquare != null && !_game.IsGameOver)
+    {
+        var (sr, sc) = _game.SelectedSquare.Value;
+        var selectedDie = _game.Board[sr, sc];
+        if (selectedDie != null)
+        {
+            <div class="rotate-controls">
+                <span class="rotate-label">Rotate <img class="rotate-label-img" src="@selectedDie.ImagePath" alt="@selectedDie.Type" /> <strong>@selectedDie.Type</strong>:</span>
+                <button class="rotate-btn up" disabled="@(!selectedDie.CanRotateUp)" @onclick="OnRotateUp">
+                    ? Up to @RotateUpName(selectedDie)
+                </button>
+                <button class="rotate-btn down" disabled="@(!selectedDie.CanRotateDown)" @onclick="OnRotateDown">
+                    ? Down to @RotateDownName(selectedDie)
+                </button>
+                <button class="rotate-btn cancel" @onclick="CancelRotateSelection">? Different die</button>
+            </div>
+        }
+    }
+
+    <div class="board-wrapper">
+        <div class="board">
+            @for (int r = 7; r >= 0; r--)
+            {
+                @for (int c = 0; c < 8; c++)
+                {
+                    var row = r;
+                    var col = c;
+                    var die = _game.Board[row, col];
+                    var isDark = (row + col) % 2 == 1;
+                    var squareClass = isDark ? "dark" : "light";
+                    var extraClass = GetSquareExtraClass(row, col);
+
+                    <div class="square @squareClass @extraClass"
+                         @onclick="() => OnSquareClick(row, col)"
+                         title="@SquareTooltip(row, col, die)">
+                        @if (die != null)
+                        {
+                            <img class="piece-image" src="@die.ImagePath" alt="@die.Owner @die.Type" />
+                            <span class="die-rank">@die.Type.ToString()[0]</span>
+                        }
+                    </div>
+                }
+            }
+        </div>
+        <div class="file-labels">
+            @foreach (var ch in "abcdefgh")
+            {
+                <span class="file-label">@ch</span>
+            }
+        </div>
+    </div>
+
+    <div class="legend">
+        <h3>Piece Reference</h3>
+        <div class="legend-grid">
+            <div class="legend-item"><img class="legend-img" src="/images/pieces/wC.svg" alt="Pyramid" /> Pyramid — cannot move or be captured (0 pts)</div>
+            <div class="legend-item"><img class="legend-img" src="/images/pieces/wP.svg" alt="Pawn" /> Pawn — 1 forward, captures diagonally (2 pts)</div>
+            <div class="legend-item"><img class="legend-img" src="/images/pieces/wB.svg" alt="Bishop" /> Bishop — diagonal slides (3 pts)</div>
+            <div class="legend-item"><img class="legend-img" src="/images/pieces/wN.svg" alt="Knight" /> Knight — L-shaped jumps (4 pts)</div>
+            <div class="legend-item"><img class="legend-img" src="/images/pieces/wR.svg" alt="Rook" /> Rook — straight slides (5 pts)</div>
+            <div class="legend-item"><img class="legend-img" src="/images/pieces/wQ.svg" alt="Queen" /> Queen — any direction, backstab vulnerability! (6 pts)</div>
+        </div>
+    </div>
+
+    <p class="instructions">
+        <strong>Each turn:</strong> Move a die, then rotate a <em>different</em> die one step up or down &bull;
+        <strong>Backstab:</strong> A Queen is captured if an enemy moves directly behind her &bull;
+        <strong>Game ends</strong> when a player has 1 die left or cannot move
+    </p>
+</div>
+
+@code {
+    private ProteusChessGame _game = null!;
+
+    protected override void OnInitialized()
+    {
+        _game = new ProteusChessGame();
+    }
+
+    private void NewGame()
+    {
+        _game.NewGame();
+    }
+
+    private void OnSquareClick(int row, int col)
+    {
+        _game.OnSquareClick(row, col);
+    }
+
+    private void OnRotateUp()
+    {
+        _game.RotateSelectedUp();
+    }
+
+    private void OnRotateDown()
+    {
+        _game.RotateSelectedDown();
+    }
+
+    private void CancelRotateSelection()
+    {
+        _game.SelectedSquare = null;
+    }
+
+    private string GetSquareExtraClass(int row, int col)
+    {
+        var classes = new List<string>();
+
+        if (_game.SelectedSquare is var (sr, sc) && sr == row && sc == col)
+            classes.Add("selected");
+
+        if (_game.IsValidMoveTarget(row, col))
+            classes.Add("valid-target");
+
+        if (_game.IsRotateCandidate(row, col) && _game.SelectedSquare == null)
+            classes.Add("rotate-candidate");
+
+        if (_game.LastMoveFrom is var (fr, fc) && fr == row && fc == col)
+            classes.Add("last-from");
+
+        if (_game.LastMoveTo is var (tr, tc) && tr == row && tc == col)
+            classes.Add("last-to");
+
+        return string.Join(" ", classes);
+    }
+
+    private string DieClass(Die die) =>
+        die.Owner == PlayerColor.White ? "white-piece" : "black-piece";
+
+    private string StatusClass =>
+        _game.IsGameOver ? "game-over" : "";
+
+    private string SquareTooltip(int row, int col, Die? die)
+    {
+        var coord = $"{"abcdefgh"[col]}{row + 1}";
+        if (die == null) return coord;
+        return $"{coord}: {die.Owner} {die.Type} ({die.PointValue} pts)";
+    }
+
+    private string RotateUpName(Die die) =>
+        die.CanRotateUp ? ((PieceType)((int)die.Type + 1)).ToString() : "—";
+
+    private string RotateDownName(Die die) =>
+        die.CanRotateDown ? ((PieceType)((int)die.Type - 1)).ToString() : "—";
+}
