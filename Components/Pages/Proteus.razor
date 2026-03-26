@@ -59,29 +59,37 @@
     }
 
     <div class="board-wrapper">
-        <div class="board">
-            @for (int r = 7; r >= 0; r--)
-            {
-                @for (int c = 0; c < 8; c++)
+        <div class="board-container">
+            <div class="rank-labels">
+                @for (int r = 7; r >= 0; r--)
                 {
-                    var row = r;
-                    var col = c;
-                    var die = _game.Board[row, col];
-                    var isDark = (row + col) % 2 == 1;
-                    var squareClass = isDark ? "dark" : "light";
-                    var extraClass = GetSquareExtraClass(row, col);
-
-                    <div class="square @squareClass @extraClass"
-                         @onclick="() => OnSquareClick(row, col)"
-                         title="@SquareTooltip(row, col, die)">
-                        @if (die != null)
-                        {
-                            <img class="piece-image" src="@die.ImagePath" alt="@die.Owner @die.Type" />
-                            <span class="piece-rank">@die.Type.ToString()[0]</span>
-                        }
-                    </div>
+                    <span class="rank-label">@(r + 1)</span>
                 }
-            }
+            </div>
+            <div class="board">
+                @for (int r = 7; r >= 0; r--)
+                {
+                    @for (int c = 0; c < 8; c++)
+                    {
+                        var row = r;
+                        var col = c;
+                        var die = _game.Board[row, col];
+                        var isDark = (row + col) % 2 == 1;
+                        var squareClass = isDark ? "dark" : "light";
+                        var extraClass = GetSquareExtraClass(row, col);
+
+                        <div class="square @squareClass @extraClass"
+                             @onclick="() => OnSquareClick(row, col)"
+                             title="@SquareTooltip(row, col, die)">
+                            @if (die != null)
+                            {
+                                <img class="piece-image" src="@die.ImagePath" alt="@die.Owner @die.Type" />
+                                <span class="piece-rank">@die.Type.ToString()[0]</span>
+                            }
+                        </div>
+                    }
+                }
+            </div>
         </div>
         <div class="file-labels">
             @foreach (var ch in "abcdefgh")

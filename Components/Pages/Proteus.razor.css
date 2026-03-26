@@ -130,6 +130,33 @@
 /* ---- Board ---- */
 .board-wrapper {
     margin: 0.5rem 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.board-container {
+    display: flex;
+    gap: 2px;
+    align-items: flex-start;
+}
+
+.rank-labels {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-around;
+    gap: 0px;
+}
+
+.rank-label {
+    width: 1.5rem;
+    height: 64px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8rem;
+    color: #666;
+    font-weight: bold;
 }
 
 .board {
@@ -146,8 +173,10 @@
     grid-template-columns: repeat(8, 64px);
     text-align: center;
     font-size: 0.8rem;
+    font-weight: bold;
     color: #666;
     margin-top: 2px;
+    margin-left: calc(1.5rem + 2px);
 }
 
 /* ---- Square ---- */
