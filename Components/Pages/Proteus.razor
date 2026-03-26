@@ -19,7 +19,7 @@
             <span class="captured-pieces">
                 @foreach (var d in _game.WhiteCaptured)
                 {
-                    <img class="captured-die-img" src="@d.ImagePath" alt="@d.Type" title="@d.Type (@d.PointValue pts)" />
+                    <img class="captured-piece-img" src="@d.ImagePath" alt="@d.Type" title="@d.Type (@d.PointValue pts)" />
                 }
             </span>
         </div>
@@ -29,7 +29,7 @@
             <span class="captured-pieces">
                 @foreach (var d in _game.BlackCaptured)
                 {
-                    <img class="captured-die-img" src="@d.ImagePath" alt="@d.Type" title="@d.Type (@d.PointValue pts)" />
+                    <img class="captured-piece-img" src="@d.ImagePath" alt="@d.Type" title="@d.Type (@d.PointValue pts)" />
                 }
             </span>
         </div>
@@ -53,7 +53,7 @@
                 <button class="rotate-btn down" disabled="@(!selectedDie.CanRotateDown)" @onclick="OnRotateDown">
                     Down to @RotateDownName(selectedDie)
                 </button>
-                <button class="rotate-btn cancel" @onclick="CancelRotateSelection">Different die</button>
+                <button class="rotate-btn cancel" @onclick="CancelRotateSelection">? Different piece</button>
             </div>
         }
     }
@@ -77,7 +77,7 @@
                         @if (die != null)
                         {
                             <img class="piece-image" src="@die.ImagePath" alt="@die.Owner @die.Type" />
-                            <span class="die-rank">@die.Type.ToString()[0]</span>
+                            <span class="piece-rank">@die.Type.ToString()[0]</span>
                         }
                     </div>
                 }
@@ -104,9 +104,9 @@
     </div>
 
     <p class="instructions">
-        <strong>Each turn:</strong> Move a die, then rotate a <em>different</em> die one step up or down &bull;
+        <strong>Each turn:</strong> Move a piece, then rotate a <em>different</em> piece one step up or down &bull;
         <strong>Backstab:</strong> A Queen is captured if an enemy moves directly behind her &bull;
-        <strong>Game ends</strong> when a player has 1 die left or cannot move
+        <strong>Game ends</strong> when a player has 1 piece left or cannot move
     </p>
 </div>
 

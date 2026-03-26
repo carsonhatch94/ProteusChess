@@ -109,13 +109,13 @@ public class ProteusChessGame
 
     // Selection state
     public (int Row, int Col)? SelectedSquare { get; set; }
-    public Die? MovedDie { get; private set; } // The die that was moved this turn (cannot be rotated)
+    public Die? MovedPiece { get; private set; } // The piece that was moved this turn (cannot be rotated)
 
     // Track the last move for highlighting
     public (int Row, int Col)? LastMoveFrom { get; private set; }
     public (int Row, int Col)? LastMoveTo { get; private set; }
 
-    public string StatusMessage { get; private set; } = "White's turn: Move a die";
+    public string StatusMessage { get; private set; } = "White's turn: Move a piece";
 
     public ProteusChessGame()
     {
@@ -125,15 +125,15 @@ public class ProteusChessGame
 
     private void SetupBoard()
     {
-        // White dice on the 8 dark squares in rows 0 and 1 (bottom two rows for white)
-        // Black dice on the 8 dark squares in rows 6 and 7 (top two rows for black)
+        // White pieces on the 8 dark squares in rows 0 and 1 (bottom two rows for white)
+        // Black pieces on the 8 dark squares in rows 6 and 7 (top two rows for black)
         // Dark squares: (row + col) % 2 == 1
 
-        PlaceStartingDice(PlayerColor.White, 0, 1);
-        PlaceStartingDice(PlayerColor.Black, 6, 7);
+        PlaceStartingPieces(PlayerColor.White, 0, 1);
+        PlaceStartingPieces(PlayerColor.Black, 6, 7);
     }
 
-    private void PlaceStartingDice(PlayerColor color, int row1, int row2)
+    private void PlaceStartingPieces(PlayerColor color, int row1, int row2)
     {
         foreach (int row in new[] { row1, row2 })
         {
@@ -203,11 +203,11 @@ public class ProteusChessGame
     {
         var die = Board[row, col];
         if (die == null || die.Owner != CurrentPlayer) return;
-        if (die == MovedDie) return; // Cannot rotate the die that just moved
+        if (die == MovedPiece) return; // Cannot rotate the piece that just moved
 
         if (SelectedSquare == null)
         {
-            // Select a die to rotate
+            // Select a piece to rotate
             if (die.CanRotateUp || die.CanRotateDown)
             {
                 SelectedSquare = (row, col);
@@ -222,7 +222,7 @@ public class ProteusChessGame
             return;
         }
 
-        // Select different die
+        // Select different piece
         if (die.CanRotateUp || die.CanRotateDown)
         {
             SelectedSquare = (row, col);
@@ -234,7 +234,7 @@ public class ProteusChessGame
         if (Phase != TurnPhase.Rotate || SelectedSquare == null) return;
         var (r, c) = SelectedSquare.Value;
         var die = Board[r, c];
-        if (die == null || die.Owner != CurrentPlayer || die == MovedDie) return;
+        if (die == null || die.Owner != CurrentPlayer || die == MovedPiece) return;
         if (!die.CanRotateUp) return;
 
         die.RotateUp();
@@ -246,7 +246,7 @@ public class ProteusChessGame
         if (Phase != TurnPhase.Rotate || SelectedSquare == null) return;
         var (r, c) = SelectedSquare.Value;
         var die = Board[r, c];
-        if (die == null || die.Owner != CurrentPlayer || die == MovedDie) return;
+        if (die == null || die.Owner != CurrentPlayer || die == MovedPiece) return;
         if (!die.CanRotateDown) return;
 
         die.RotateDown();
@@ -272,11 +272,11 @@ public class ProteusChessGame
 
         LastMoveFrom = (fromRow, fromCol);
         LastMoveTo = (toRow, toCol);
-        MovedDie = movingDie;
+        MovedPiece = movingDie;
         SelectedSquare = null;
 
-        // Check if opponent has only 1 die left
-        if (CountDice(Opponent(CurrentPlayer)) <= 1)
+        // Check if opponent has only 1 piece left
+        if (CountPieces(Opponent(CurrentPlayer)) <= 1)
         {
             EndGame(GameEndReason.OnePlayerDown);
             return;
@@ -284,10 +284,10 @@ public class ProteusChessGame
 
         // Move to rotation phase
         Phase = TurnPhase.Rotate;
-        StatusMessage = $"{CurrentPlayer}'s turn: Rotate a different die (up or down)";
+        StatusMessage = $"{CurrentPlayer}'s turn: Rotate a different piece (up or down)";
 
-        // Check if there are any dice to rotate (other than the moved one)
-        if (!HasRotatableDie())
+        // Check if there are any pieces to rotate (other than the moved one)
+        if (!HasRotatablePiece())
         {
             // Skip rotation — end turn
             FinishTurn();
@@ -348,14 +348,14 @@ public class ProteusChessGame
     private void FinishTurn()
     {
         SelectedSquare = null;
-        MovedDie = null;
+        MovedPiece = null;
         CurrentPlayer = Opponent(CurrentPlayer);
         Phase = TurnPhase.Move;
 
         // Check if the new current player can move
         if (!CheckForNoMoves())
         {
-            StatusMessage = $"{CurrentPlayer}'s turn: Move a die";
+            StatusMessage = $"{CurrentPlayer}'s turn: Move a piece";
         }
     }
 
@@ -402,7 +402,7 @@ public class ProteusChessGame
     private static PlayerColor Opponent(PlayerColor color) =>
         color == PlayerColor.White ? PlayerColor.Black : PlayerColor.White;
 
-    private int CountDice(PlayerColor color)
+    private int CountPieces(PlayerColor color)
     {
         int count = 0;
         for (int r = 0; r < 8; r++)
@@ -411,13 +411,13 @@ public class ProteusChessGame
         return count;
     }
 
-    private bool HasRotatableDie()
+    private bool HasRotatablePiece()
     {
         for (int r = 0; r < 8; r++)
             for (int c = 0; c < 8; c++)
             {
                 var d = Board[r, c];
-                if (d != null && d.Owner == CurrentPlayer && d != MovedDie
+                if (d != null && d.Owner == CurrentPlayer && d != MovedPiece
                     && (d.CanRotateUp || d.CanRotateDown))
                     return true;
             }
@@ -592,7 +592,7 @@ public class ProteusChessGame
     {
         if (Phase != TurnPhase.Rotate) return false;
         var d = Board[row, col];
-        return d != null && d.Owner == CurrentPlayer && d != MovedDie
+        return d != null && d.Owner == CurrentPlayer && d != MovedPiece
                && (d.CanRotateUp || d.CanRotateDown);
     }
 
@@ -611,10 +611,10 @@ public class ProteusChessGame
         EndReason = GameEndReason.None;
         Winner = null;
         SelectedSquare = null;
-        MovedDie = null;
+        MovedPiece = null;
         LastMoveFrom = null;
         LastMoveTo = null;
-        StatusMessage = "White's turn: Move a die";
+        StatusMessage = "White's turn: Move a piece";
 
         SetupBoard();
         CheckForNoMoves();

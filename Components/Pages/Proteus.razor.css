@@ -58,10 +58,6 @@
     margin-left: 0.3rem;
 }
 
-.captured-die {
-    font-size: 1.1rem;
-}
-
 /* ---- Status ---- */
 .status-bar {
     margin-bottom: 0.5rem;
@@ -217,7 +213,7 @@
     background: #a8a060;
 }
 
-/* ---- Die ---- */
+/* ---- Piece ---- */
 .piece-image {
     width: 48px;
     height: 48px;
@@ -225,7 +221,7 @@
     pointer-events: none;
 }
 
-.die-rank {
+.piece-rank {
     position: absolute;
     bottom: 1px;
     right: 3px;
@@ -236,7 +232,7 @@
 }
 
 /* ---- Captured pieces ---- */
-.captured-die-img {
+.captured-piece-img {
     width: 22px;
     height: 22px;
     object-fit: contain;
