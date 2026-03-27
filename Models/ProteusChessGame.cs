@@ -16,12 +16,12 @@ public enum PlayerColor
     Black
 }
 
-public class Die
+public class Piece
 {
     public PlayerColor Owner { get; }
     public PieceType Type { get; set; }
 
-    public Die(PlayerColor owner, PieceType type = PieceType.Pawn)
+    public Piece(PlayerColor owner, PieceType type = PieceType.Pawn)
     {
         Owner = owner;
         Type = type;
@@ -83,7 +83,7 @@ public class Die
 
 public enum TurnPhase
 {
-    Move,    // Player must move a die
+    Move,    // Player must move a piece
     Rotate   // Player must rotate a different die
 }
 
@@ -96,20 +96,20 @@ public enum GameEndReason
 
 public class ProteusChessGame
 {
-    public Die?[,] Board { get; } = new Die?[8, 8];
+    public Piece?[,] Board { get; } = new Piece?[8, 8];
     public PlayerColor CurrentPlayer { get; private set; } = PlayerColor.White;
     public TurnPhase Phase { get; private set; } = TurnPhase.Move;
-    public List<Die> WhiteCaptured { get; } = []; // Pieces white captured (from black)
-    public List<Die> BlackCaptured { get; } = []; // Pieces black captured (from white)
-    public int WhiteScore => WhiteCaptured.Sum(d => d.PointValue);
-    public int BlackScore => BlackCaptured.Sum(d => d.PointValue);
+    public List<Piece> WhiteCaptured { get; } = []; // Pieces white captured (from black)
+    public List<Piece> BlackCaptured { get; } = []; // Pieces black captured (from white)
+    public int WhiteScore => WhiteCaptured.Sum(p => p.PointValue);
+    public int BlackScore => BlackCaptured.Sum(p => p.PointValue);
     public bool IsGameOver { get; private set; }
     public GameEndReason EndReason { get; private set; } = GameEndReason.None;
     public PlayerColor? Winner { get; private set; }
 
     // Selection state
     public (int Row, int Col)? SelectedSquare { get; set; }
-    public Die? MovedPiece { get; private set; } // The piece that was moved this turn (cannot be rotated)
+    public Piece? MovedPiece { get; private set; } // The piece that was moved this turn (cannot be rotated)
 
     // Track the last move for highlighting
     public (int Row, int Col)? LastMoveFrom { get; private set; }
@@ -141,7 +141,7 @@ public class ProteusChessGame
             {
                 if ((row + col) % 2 == 1)
                 {
-                    Board[row, col] = new Die(color);
+                    Board[row, col] = new Piece(color);
                 }
             }
         }
@@ -159,12 +159,12 @@ public class ProteusChessGame
 
     private void HandleMovePhase(int row, int col)
     {
-        var die = Board[row, col];
+        var piece = Board[row, col];
 
         if (SelectedSquare == null)
         {
             // Select a piece to move
-            if (die != null && die.Owner == CurrentPlayer && die.Type != PieceType.Pyramid)
+            if (piece != null && piece.Owner == CurrentPlayer && piece.Type != PieceType.Pyramid)
             {
                 SelectedSquare = (row, col);
             }
@@ -181,7 +181,7 @@ public class ProteusChessGame
         }
 
         // Clicking another friendly piece switches selection
-        if (die != null && die.Owner == CurrentPlayer && die.Type != PieceType.Pyramid)
+        if (piece != null && piece.Owner == CurrentPlayer && piece.Type != PieceType.Pyramid)
         {
             SelectedSquare = (row, col);
             return;
@@ -201,14 +201,14 @@ public class ProteusChessGame
 
     private void HandleRotatePhase(int row, int col)
     {
-        var die = Board[row, col];
-        if (die == null || die.Owner != CurrentPlayer) return;
-        if (die == MovedPiece) return; // Cannot rotate the piece that just moved
+        var piece = Board[row, col];
+        if (piece == null || piece.Owner != CurrentPlayer) return;
+        if (piece == MovedPiece) return; // Cannot rotate the piece that just moved
 
         if (SelectedSquare == null)
         {
             // Select a piece to rotate
-            if (die.CanRotateUp || die.CanRotateDown)
+            if (piece.CanRotateUp || piece.CanRotateDown)
             {
                 SelectedSquare = (row, col);
             }
@@ -223,7 +223,7 @@ public class ProteusChessGame
         }
 
         // Select different piece
-        if (die.CanRotateUp || die.CanRotateDown)
+        if (piece.CanRotateUp || piece.CanRotateDown)
         {
             SelectedSquare = (row, col);
         }
@@ -233,11 +233,11 @@ public class ProteusChessGame
     {
         if (Phase != TurnPhase.Rotate || SelectedSquare == null) return;
         var (r, c) = SelectedSquare.Value;
-        var die = Board[r, c];
-        if (die == null || die.Owner != CurrentPlayer || die == MovedPiece) return;
-        if (!die.CanRotateUp) return;
+        var piece = Board[r, c];
+        if (piece == null || piece.Owner != CurrentPlayer || piece == MovedPiece) return;
+        if (!piece.CanRotateUp) return;
 
-        die.RotateUp();
+        piece.RotateUp();
         FinishTurn();
     }
 
@@ -245,34 +245,34 @@ public class ProteusChessGame
     {
         if (Phase != TurnPhase.Rotate || SelectedSquare == null) return;
         var (r, c) = SelectedSquare.Value;
-        var die = Board[r, c];
-        if (die == null || die.Owner != CurrentPlayer || die == MovedPiece) return;
-        if (!die.CanRotateDown) return;
+        var piece = Board[r, c];
+        if (piece == null || piece.Owner != CurrentPlayer || piece == MovedPiece) return;
+        if (!piece.CanRotateDown) return;
 
-        die.RotateDown();
+        piece.RotateDown();
         FinishTurn();
     }
 
     private void ExecuteMove(int fromRow, int fromCol, int toRow, int toCol)
     {
-        var movingDie = Board[fromRow, fromCol]!;
-        var targetDie = Board[toRow, toCol];
+        var movingPiece = Board[fromRow, fromCol]!;
+        var targetPiece = Board[toRow, toCol];
 
         // Handle capture
-        if (targetDie != null && targetDie.Owner != movingDie.Owner)
+        if (targetPiece != null && targetPiece.Owner != movingPiece.Owner)
         {
-            Capture(movingDie.Owner, targetDie);
+            Capture(movingPiece.Owner, targetPiece);
         }
 
-        Board[toRow, toCol] = movingDie;
+        Board[toRow, toCol] = movingPiece;
         Board[fromRow, fromCol] = null;
 
         // Check for Queen backstab: moving to the square directly behind an opponent's Queen
-        CheckQueenBackstab(movingDie, toRow, toCol);
+        CheckQueenBackstab(movingPiece, toRow, toCol);
 
         LastMoveFrom = (fromRow, fromCol);
         LastMoveTo = (toRow, toCol);
-        MovedPiece = movingDie;
+        MovedPiece = movingPiece;
         SelectedSquare = null;
 
         // Check if opponent has only 1 piece left
@@ -294,7 +294,7 @@ public class ProteusChessGame
         }
     }
 
-    private void CheckQueenBackstab(Die movingDie, int toRow, int toCol)
+    private void CheckQueenBackstab(Piece movingPiece, int toRow, int toCol)
     {
         // After moving, check all 8 neighbors and diagonals for opponent Queens
         // whose "back square" is (toRow, toCol).
@@ -306,12 +306,12 @@ public class ProteusChessGame
         // For a white Queen at (qr, qc): back square is (qr - 1, qc) — if qr > 0
         // For a black Queen at (qr, qc): back square is (qr + 1, qc) — if qr < 7
 
-        // White Queen's back is at (qr-1, qc). If movingDie moved to (qr-1, qc), check (qr-1+1, qc) = (qr, qc) for white queen.
+        // White Queen's back is at (qr-1, qc). If movingPiece moved to (qr-1, qc), check (qr-1+1, qc) = (qr, qc) for white queen.
         // So if we moved to (toRow, toCol), check if there's a White Queen at (toRow+1, toCol) whose back is (toRow, toCol).
         // And check if there's a Black Queen at (toRow-1, toCol) whose back is (toRow, toCol).
 
         // Check for opponent White Queen at (toRow+1, toCol)
-        if (movingDie.Owner == PlayerColor.Black && toRow + 1 < 8)
+        if (movingPiece.Owner == PlayerColor.Black && toRow + 1 < 8)
         {
             var candidate = Board[toRow + 1, toCol];
             if (candidate != null && candidate.Owner == PlayerColor.White && candidate.Type == PieceType.Queen
@@ -324,7 +324,7 @@ public class ProteusChessGame
         }
 
         // Check for opponent Black Queen at (toRow-1, toCol)
-        if (movingDie.Owner == PlayerColor.White && toRow - 1 >= 0)
+        if (movingPiece.Owner == PlayerColor.White && toRow - 1 >= 0)
         {
             var candidate = Board[toRow - 1, toCol];
             if (candidate != null && candidate.Owner == PlayerColor.Black && candidate.Type == PieceType.Queen
@@ -337,7 +337,7 @@ public class ProteusChessGame
         }
     }
 
-    private void Capture(PlayerColor capturer, Die captured)
+    private void Capture(PlayerColor capturer, Piece captured)
     {
         if (capturer == PlayerColor.White)
             WhiteCaptured.Add(captured);
@@ -416,9 +416,9 @@ public class ProteusChessGame
         for (int r = 0; r < 8; r++)
             for (int c = 0; c < 8; c++)
             {
-                var d = Board[r, c];
-                if (d != null && d.Owner == CurrentPlayer && d != MovedPiece
-                    && (d.CanRotateUp || d.CanRotateDown))
+                var p = Board[r, c];
+                if (p != null && p.Owner == CurrentPlayer && p != MovedPiece
+                    && (p.CanRotateUp || p.CanRotateDown))
                     return true;
             }
         return false;
@@ -431,8 +431,8 @@ public class ProteusChessGame
         for (int r = 0; r < 8; r++)
             for (int c = 0; c < 8; c++)
             {
-                var d = Board[r, c];
-                if (d != null && d.Owner == color && d.Type != PieceType.Pyramid)
+                var p = Board[r, c];
+                if (p != null && p.Owner == color && p.Type != PieceType.Pyramid)
                 {
                     if (GetValidMoves(r, c).Count > 0) return true;
                 }
@@ -442,17 +442,17 @@ public class ProteusChessGame
 
     public List<(int Row, int Col)> GetValidMoves(int fromRow, int fromCol)
     {
-        var die = Board[fromRow, fromCol];
-        if (die == null) return [];
+        var piece = Board[fromRow, fromCol];
+        if (piece == null) return [];
 
-        return die.Type switch
+        return piece.Type switch
         {
             PieceType.Pyramid => [],
-            PieceType.Pawn => GetPawnMoves(fromRow, fromCol, die),
-            PieceType.Bishop => GetBishopMoves(fromRow, fromCol, die),
-            PieceType.Knight => GetKnightMoves(fromRow, fromCol, die),
-            PieceType.Rook => GetRookMoves(fromRow, fromCol, die),
-            PieceType.Queen => GetQueenMoves(fromRow, fromCol, die),
+            PieceType.Pawn => GetPawnMoves(fromRow, fromCol, piece),
+            PieceType.Bishop => GetBishopMoves(fromRow, fromCol, piece),
+            PieceType.Knight => GetKnightMoves(fromRow, fromCol, piece),
+            PieceType.Rook => GetRookMoves(fromRow, fromCol, piece),
+            PieceType.Queen => GetQueenMoves(fromRow, fromCol, piece),
             _ => []
         };
     }
@@ -462,10 +462,10 @@ public class ProteusChessGame
         return GetValidMoves(fromRow, fromCol).Contains((toRow, toCol));
     }
 
-    private List<(int Row, int Col)> GetPawnMoves(int row, int col, Die die)
+    private List<(int Row, int Col)> GetPawnMoves(int row, int col, Piece piece)
     {
         var moves = new List<(int, int)>();
-        int direction = die.Owner == PlayerColor.White ? 1 : -1;
+        int direction = piece.Owner == PlayerColor.White ? 1 : -1;
 
         // Forward one
         int newRow = row + direction;
@@ -474,7 +474,7 @@ public class ProteusChessGame
             moves.Add((newRow, col));
 
             // Forward two from starting squares
-            if (IsOnStartingSquares(row, die.Owner))
+            if (IsOnStartingSquares(row, piece.Owner))
             {
                 int newRow2 = row + 2 * direction;
                 if (InBounds(newRow2, col) && Board[newRow2, col] == null)
@@ -491,7 +491,7 @@ public class ProteusChessGame
             if (InBounds(newRow, nc))
             {
                 var target = Board[newRow, nc];
-                if (target != null && target.Owner != die.Owner && target.Type != PieceType.Pyramid)
+                if (target != null && target.Owner != piece.Owner && target.Type != PieceType.Pyramid)
                 {
                     moves.Add((newRow, nc));
                 }
@@ -508,16 +508,16 @@ public class ProteusChessGame
         return color == PlayerColor.White ? row is 0 or 1 : row is 6 or 7;
     }
 
-    private List<(int Row, int Col)> GetBishopMoves(int row, int col, Die die)
+    private List<(int Row, int Col)> GetBishopMoves(int row, int col, Piece piece)
     {
         var moves = new List<(int, int)>();
         int[][] directions = [[1, 1], [1, -1], [-1, 1], [-1, -1]];
         foreach (var dir in directions)
-            AddSlidingMoves(moves, row, col, dir[0], dir[1], die);
+            AddSlidingMoves(moves, row, col, dir[0], dir[1], piece);
         return moves;
     }
 
-    private List<(int Row, int Col)> GetKnightMoves(int row, int col, Die die)
+    private List<(int Row, int Col)> GetKnightMoves(int row, int col, Piece piece)
     {
         var moves = new List<(int, int)>();
         int[][] offsets = [[2, 1], [2, -1], [-2, 1], [-2, -1], [1, 2], [1, -2], [-1, 2], [-1, -2]];
@@ -528,31 +528,31 @@ public class ProteusChessGame
             var target = Board[nr, nc];
             if (target == null)
                 moves.Add((nr, nc));
-            else if (target.Owner != die.Owner && target.Type != PieceType.Pyramid)
+            else if (target.Owner != piece.Owner && target.Type != PieceType.Pyramid)
                 moves.Add((nr, nc));
         }
         return moves;
     }
 
-    private List<(int Row, int Col)> GetRookMoves(int row, int col, Die die)
+    private List<(int Row, int Col)> GetRookMoves(int row, int col, Piece piece)
     {
         var moves = new List<(int, int)>();
         int[][] directions = [[1, 0], [-1, 0], [0, 1], [0, -1]];
         foreach (var dir in directions)
-            AddSlidingMoves(moves, row, col, dir[0], dir[1], die);
+            AddSlidingMoves(moves, row, col, dir[0], dir[1], piece);
         return moves;
     }
 
-    private List<(int Row, int Col)> GetQueenMoves(int row, int col, Die die)
+    private List<(int Row, int Col)> GetQueenMoves(int row, int col, Piece piece)
     {
         var moves = new List<(int, int)>();
         int[][] directions = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
         foreach (var dir in directions)
-            AddSlidingMoves(moves, row, col, dir[0], dir[1], die);
+            AddSlidingMoves(moves, row, col, dir[0], dir[1], piece);
         return moves;
     }
 
-    private void AddSlidingMoves(List<(int, int)> moves, int row, int col, int dr, int dc, Die die)
+    private void AddSlidingMoves(List<(int, int)> moves, int row, int col, int dr, int dc, Piece piece)
     {
         int r = row + dr, c = col + dc;
         while (InBounds(r, c))
@@ -562,7 +562,7 @@ public class ProteusChessGame
             {
                 moves.Add((r, c));
             }
-            else if (target.Owner != die.Owner && target.Type != PieceType.Pyramid)
+            else if (target.Owner != piece.Owner && target.Type != PieceType.Pyramid)
             {
                 moves.Add((r, c));
                 break; // Can capture but can't go further
@@ -591,9 +591,9 @@ public class ProteusChessGame
     public bool IsRotateCandidate(int row, int col)
     {
         if (Phase != TurnPhase.Rotate) return false;
-        var d = Board[row, col];
-        return d != null && d.Owner == CurrentPlayer && d != MovedPiece
-               && (d.CanRotateUp || d.CanRotateDown);
+        var p = Board[row, col];
+        return p != null && p.Owner == CurrentPlayer && p != MovedPiece
+               && (p.CanRotateUp || p.CanRotateDown);
     }
 
     public void NewGame()

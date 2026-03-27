@@ -17,9 +17,9 @@
             <span class="score-label">White:</span>
             <span class="score-value">@_game.WhiteScore pts</span>
             <span class="captured-pieces">
-                @foreach (var d in _game.WhiteCaptured)
+                @foreach (var p in _game.WhiteCaptured)
                 {
-                    <img class="captured-piece-img" src="@d.ImagePath" alt="@d.Type" title="@d.Type (@d.PointValue pts)" />
+                    <img class="captured-piece-img" src="@p.ImagePath" alt="@p.Type" title="@p.Type (@p.PointValue pts)" />
                 }
             </span>
         </div>
@@ -27,9 +27,9 @@
             <span class="score-label">Black:</span>
             <span class="score-value">@_game.BlackScore pts</span>
             <span class="captured-pieces">
-                @foreach (var d in _game.BlackCaptured)
+                @foreach (var p in _game.BlackCaptured)
                 {
-                    <img class="captured-piece-img" src="@d.ImagePath" alt="@d.Type" title="@d.Type (@d.PointValue pts)" />
+                    <img class="captured-piece-img" src="@p.ImagePath" alt="@p.Type" title="@p.Type (@p.PointValue pts)" />
                 }
             </span>
         </div>
@@ -54,18 +54,18 @@
                     {
                         var row = r;
                         var col = c;
-                        var die = _game.Board[row, col];
+                        var piece = _game.Board[row, col];
                         var isDark = (row + col) % 2 == 1;
                         var squareClass = isDark ? "dark" : "light";
                         var extraClass = GetSquareExtraClass(row, col);
 
                         <div class="square @squareClass @extraClass"
                              @onclick="() => OnSquareClick(row, col)"
-                             title="@SquareTooltip(row, col, die)">
-                            @if (die != null)
+                             title="@SquareTooltip(row, col, piece)">
+                            @if (piece != null)
                             {
-                                <img class="piece-image" src="@die.ImagePath" alt="@die.Owner @die.Type" />
-                                <span class="piece-rank">@die.Type.ToString()[0]</span>
+                                <img class="piece-image" src="@piece.ImagePath" alt="@piece.Owner @piece.Type" />
+                                <span class="piece-rank">@piece.Type.ToString()[0]</span>
                             }
                         </div>
                     }
@@ -95,16 +95,16 @@
     @if (_game.Phase == TurnPhase.Rotate && _game.SelectedSquare != null && !_game.IsGameOver)
     {
         var (sr, sc) = _game.SelectedSquare.Value;
-        var selectedDie = _game.Board[sr, sc];
-        if (selectedDie != null)
+        var selectedPiece = _game.Board[sr, sc];
+        if (selectedPiece != null)
         {
             <div class="rotate-controls">
-                <span class="rotate-label">Rotate <img class="rotate-label-img" src="@selectedDie.ImagePath" alt="@selectedDie.Type" /> <strong>@selectedDie.Type</strong>:</span>
-                <button class="rotate-btn up" disabled="@(!selectedDie.CanRotateUp)" @onclick="OnRotateUp">
-                    ⬆️ Up to @RotateUpName(selectedDie)
+                <span class="rotate-label">Rotate <img class="rotate-label-img" src="@selectedPiece.ImagePath" alt="@selectedPiece.Type" /> <strong>@selectedPiece.Type</strong>:</span>
+                <button class="rotate-btn up" disabled="@(!selectedPiece.CanRotateUp)" @onclick="OnRotateUp">
+                    ⬆️ Up to @RotateUpName(selectedPiece)
                 </button>
-                <button class="rotate-btn down" disabled="@(!selectedDie.CanRotateDown)" @onclick="OnRotateDown">
-                    ⬇️ Down to @RotateDownName(selectedDie)
+                <button class="rotate-btn down" disabled="@(!selectedPiece.CanRotateDown)" @onclick="OnRotateDown">
+                    ⬇️ Down to @RotateDownName(selectedPiece)
                 </button>
                 <button class="rotate-btn cancel" @onclick="CancelRotateSelection">✖ Different piece</button>
             </div>
@@ -134,7 +134,7 @@
     private void OnSquareClick(int row, int col)
     {
         _game.OnSquareClick(row, col);
-    }
+        }
 
     private void OnRotateUp()
     {
@@ -173,22 +173,22 @@
         return string.Join(" ", classes);
     }
 
-    private string DieClass(Die die) =>
-        die.Owner == PlayerColor.White ? "white-piece" : "black-piece";
+    private string PieceClass(Piece piece) =>
+        piece.Owner == PlayerColor.White ? "white-piece" : "black-piece";
 
     private string StatusClass =>
         _game.IsGameOver ? "game-over" : "";
 
-    private string SquareTooltip(int row, int col, Die? die)
+    private string SquareTooltip(int row, int col, Piece? piece)
     {
         var coord = $"{"abcdefgh"[col]}{row + 1}";
-        if (die == null) return coord;
-        return $"{coord}: {die.Owner} {die.Type} ({die.PointValue} pts)";
+        if (piece == null) return coord;
+        return $"{coord}: {piece.Owner} {piece.Type} ({piece.PointValue} pts)";
     }
 
-    private string RotateUpName(Die die) =>
-        die.CanRotateUp ? ((PieceType)((int)die.Type + 1)).ToString() : "—";
+    private string RotateUpName(Piece piece) =>
+        piece.CanRotateUp ? ((PieceType)((int)piece.Type + 1)).ToString() : "—";
 
-    private string RotateDownName(Die die) =>
-        die.CanRotateDown ? ((PieceType)((int)die.Type - 1)).ToString() : "—";
+    private string RotateDownName(Piece piece) =>
+        piece.CanRotateDown ? ((PieceType)((int)piece.Type - 1)).ToString() : "—";
 }
