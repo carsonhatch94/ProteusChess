@@ -20,6 +20,6 @@ public class GameRoom
 
     private static string GenerateCode()
     {
-        return Guid.NewGuid().ToString("N")[..6].ToUpperInvariant();
+        return Guid.NewGuid().ToString("N")[..4].ToUpperInvariant();
     }
 }

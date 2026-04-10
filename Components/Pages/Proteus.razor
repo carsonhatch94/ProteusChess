@@ -5,6 +5,7 @@
 @using ProteusChess.Hubs
 @using ProteusChess.Models
 @inject NavigationManager Navigation
+@inject IJSRuntime JS
 @implements IAsyncDisposable
 
 <PageTitle>Proteus Chess</PageTitle>
@@ -19,7 +20,7 @@
             <div class="lobby-actions">
                 <button class="new-game-btn" @onclick="CreateRoom">Create Room</button>
                 <div class="join-section">
-                    <input class="room-code-input" @bind="_joinCode" @bind:event="oninput" placeholder="Room code" maxlength="6" />
+                    <input class="room-code-input" @bind="_joinCode" @bind:event="oninput" placeholder="Room code" maxlength="4" />
                     <button class="new-game-btn" @onclick="JoinRoom">Join</button>
                 </div>
             </div>
@@ -37,7 +38,11 @@
         <div class="controls">
             @if (_isMultiplayer)
             {
-                <span class="room-info">Room: <strong>@_roomCode</strong> — You are <strong>@_myColor</strong></span>
+                <span class="room-info">
+                    Room: <strong>@_roomCode</strong>
+                    <button class="copy-btn" @onclick="CopyRoomCode" title="Copy room code">@(_copied ? "✔ Copied" : "📋 Copy")</button>
+                    — You are <strong>@_myColor</strong>
+                </span>
                 @if (!_roomFull)
                 {
                     <span class="waiting">Waiting for opponent…</span>
@@ -164,6 +169,7 @@
     private string _joinCode = "";
     private string _lobbyMessage = "";
     private PlayerColor? _myColor;
+    private bool _copied;
 
     // --- Local game (for non-multiplayer) ---
     private ProteusChessGame? _localGame;
@@ -258,6 +264,21 @@
         _inRoom = true;
         _roomFull = dto.IsFull;
         ApplyDto(dto);
+    }
+
+    private async Task CopyRoomCode()
+    {
+        await JS.InvokeVoidAsync("navigator.clipboard.writeText", _roomCode);
+        _copied = true;
+        StateHasChanged();
+        _ = ResetCopiedAfterDelay();
+    }
+
+    private async Task ResetCopiedAfterDelay()
+    {
+        await Task.Delay(2000);
+        _copied = false;
+        await InvokeAsync(StateHasChanged);
     }
 
     private void StartLocalGame()
