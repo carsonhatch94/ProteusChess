@@ -1,194 +1,573 @@
 ﻿@page "/proteus"
 @page "/"
 @rendermode InteractiveServer
+@using Microsoft.AspNetCore.SignalR.Client
+@using ProteusChess.Hubs
 @using ProteusChess.Models
+@inject NavigationManager Navigation
+@implements IAsyncDisposable
 
 <PageTitle>Proteus Chess</PageTitle>
 
 <div class="proteus-container">
     <h1>Proteus Chess</h1>
 
-    <div class="controls">
-        <button class="new-game-btn" @onclick="NewGame">New Game</button>
-    </div>
-
-    <div class="score-bar">
-        <div class="score white-score">
-            <span class="score-label">White:</span>
-            <span class="score-value">@_game.WhiteScore pts</span>
-            <span class="captured-pieces">
-                @foreach (var p in _game.WhiteCaptured)
-                {
-                    <img class="captured-piece-img" src="@p.ImagePath" alt="@p.Type" title="@p.Type (@p.PointValue pts)" />
-                }
-            </span>
-        </div>
-        <div class="score black-score">
-            <span class="score-label">Black:</span>
-            <span class="score-value">@_game.BlackScore pts</span>
-            <span class="captured-pieces">
-                @foreach (var p in _game.BlackCaptured)
-                {
-                    <img class="captured-piece-img" src="@p.ImagePath" alt="@p.Type" title="@p.Type (@p.PointValue pts)" />
-                }
-            </span>
-        </div>
-    </div>
-
-    <div class="status-bar">
-        <span class="status-message @StatusClass">@_game.StatusMessage</span>
-    </div>
-
-    <div class="board-wrapper">
-        <div class="board-container">
-            <div class="rank-labels">
-                @for (int r = 7; r >= 0; r--)
-                {
-                    <span class="rank-label">@(r + 1)</span>
-                }
-            </div>
-            <div class="board">
-                @for (int r = 7; r >= 0; r--)
-                {
-                    @for (int c = 0; c < 8; c++)
-                    {
-                        var row = r;
-                        var col = c;
-                        var piece = _game.Board[row, col];
-                        var isDark = (row + col) % 2 == 1;
-                        var squareClass = isDark ? "dark" : "light";
-                        var extraClass = GetSquareExtraClass(row, col);
-
-                        <div class="square @squareClass @extraClass"
-                             @onclick="() => OnSquareClick(row, col)"
-                             title="@SquareTooltip(row, col, piece)">
-                            @if (piece != null)
-                            {
-                                <img class="piece-image" src="@piece.ImagePath" alt="@piece.Owner @piece.Type" />
-                                <span class="piece-rank">@piece.Type.ToString()[0]</span>
-                            }
-                        </div>
-                    }
-                }
-            </div>
-        </div>
-        <div class="file-labels">
-            @foreach (var ch in "abcdefgh")
-            {
-                <span class="file-label">@ch</span>
-            }
-        </div>
-    </div>
-
-    <div class="legend">
-        <h3>Piece Reference</h3>
-        <div class="legend-grid">
-            <div class="legend-item"><img class="legend-img" src="/images/pieces/wC.svg" alt="Pyramid" /> Pyramid — cannot move or be captured (0 pts)</div>
-            <div class="legend-item"><img class="legend-img" src="/images/pieces/wP.svg" alt="Pawn" /> Pawn — 1 forward, captures diagonally (2 pts)</div>
-            <div class="legend-item"><img class="legend-img" src="/images/pieces/wB.svg" alt="Bishop" /> Bishop — diagonal slides (3 pts)</div>
-            <div class="legend-item"><img class="legend-img" src="/images/pieces/wN.svg" alt="Knight" /> Knight — L-shaped jumps (4 pts)</div>
-            <div class="legend-item"><img class="legend-img" src="/images/pieces/wR.svg" alt="Rook" /> Rook — straight slides (5 pts)</div>
-            <div class="legend-item"><img class="legend-img" src="/images/pieces/wQ.svg" alt="Queen" /> Queen — any direction, backstab vulnerability! (6 pts)</div>
-        </div>
-    </div>
-
-    @if (_game.Phase == TurnPhase.Rotate && _game.SelectedSquare != null && !_game.IsGameOver)
+    @if (!_inRoom)
     {
-        var (sr, sc) = _game.SelectedSquare.Value;
-        var selectedPiece = _game.Board[sr, sc];
-        if (selectedPiece != null)
-        {
-            <div class="rotate-controls">
-                <span class="rotate-label">Rotate <img class="rotate-label-img" src="@selectedPiece.ImagePath" alt="@selectedPiece.Type" /> <strong>@selectedPiece.Type</strong>:</span>
-                <button class="rotate-btn up" disabled="@(!selectedPiece.CanRotateUp)" @onclick="OnRotateUp">
-                    ⬆️ Up to @RotateUpName(selectedPiece)
-                </button>
-                <button class="rotate-btn down" disabled="@(!selectedPiece.CanRotateDown)" @onclick="OnRotateDown">
-                    ⬇️ Down to @RotateDownName(selectedPiece)
-                </button>
-                <button class="rotate-btn cancel" @onclick="CancelRotateSelection">✖ Different piece</button>
+        <div class="lobby">
+            <h2>Multiplayer</h2>
+            <div class="lobby-actions">
+                <button class="new-game-btn" @onclick="CreateRoom">Create Room</button>
+                <div class="join-section">
+                    <input class="room-code-input" @bind="_joinCode" @bind:event="oninput" placeholder="Room code" maxlength="6" />
+                    <button class="new-game-btn" @onclick="JoinRoom">Join</button>
+                </div>
             </div>
-        }
+            @if (!string.IsNullOrEmpty(_lobbyMessage))
+            {
+                <p class="lobby-message">@_lobbyMessage</p>
+            }
+            <hr />
+            <h2>Local Play</h2>
+            <button class="new-game-btn" @onclick="StartLocalGame">Play on this computer</button>
+        </div>
     }
+    else
+    {
+        <div class="controls">
+            @if (_isMultiplayer)
+            {
+                <span class="room-info">Room: <strong>@_roomCode</strong> — You are <strong>@_myColor</strong></span>
+                @if (!_roomFull)
+                {
+                    <span class="waiting">Waiting for opponent…</span>
+                }
+            }
+            <button class="new-game-btn" @onclick="NewGame">New Game</button>
+            <button class="new-game-btn" @onclick="LeaveRoom">Leave</button>
+        </div>
 
-    <p class="instructions">
-        <strong>Each turn:</strong> Move a piece, then rotate a <em>different</em> piece one step up or down &bull;
-        <strong>Backstab:</strong> A Queen is captured if an enemy moves directly behind her &bull;
-        <strong>Game ends</strong> when a player has 1 piece left or cannot move
-    </p>
+        <div class="score-bar">
+            <div class="score white-score">
+                <span class="score-label">White:</span>
+                <span class="score-value">@_whiteScore pts</span>
+                <span class="captured-pieces">
+                    @foreach (var p in _whiteCaptured)
+                    {
+                        <img class="captured-piece-img" src="@p.ImagePath" alt="@p.Type" title="@p.Type (@p.PointValue pts)" />
+                    }
+                </span>
+            </div>
+            <div class="score black-score">
+                <span class="score-label">Black:</span>
+                <span class="score-value">@_blackScore pts</span>
+                <span class="captured-pieces">
+                    @foreach (var p in _blackCaptured)
+                    {
+                        <img class="captured-piece-img" src="@p.ImagePath" alt="@p.Type" title="@p.Type (@p.PointValue pts)" />
+                    }
+                </span>
+            </div>
+        </div>
+
+        <div class="status-bar">
+            <span class="status-message @StatusClass">@_statusMessage</span>
+        </div>
+
+        <div class="board-wrapper">
+            <div class="board-container">
+                <div class="rank-labels">
+                    @for (int r = 7; r >= 0; r--)
+                    {
+                        <span class="rank-label">@(r + 1)</span>
+                    }
+                </div>
+                <div class="board">
+                    @for (int r = 7; r >= 0; r--)
+                    {
+                        @for (int c = 0; c < 8; c++)
+                        {
+                            var row = r;
+                            var col = c;
+                            var piece = GetPiece(row, col);
+                            var isDark = (row + col) % 2 == 1;
+                            var squareClass = isDark ? "dark" : "light";
+                            var extraClass = GetSquareExtraClass(row, col);
+
+                            <div class="square @squareClass @extraClass"
+                                 @onclick="() => OnSquareClick(row, col)"
+                                 title="@SquareTooltip(row, col, piece)">
+                                @if (piece != null)
+                                {
+                                    <img class="piece-image" src="@piece.ImagePath" alt="@piece.Owner @piece.Type" />
+                                    <span class="piece-rank">@piece.Type.ToString()[0]</span>
+                                }
+                            </div>
+                        }
+                    }
+                </div>
+            </div>
+            <div class="file-labels">
+                @foreach (var ch in "abcdefgh")
+                {
+                    <span class="file-label">@ch</span>
+                }
+            </div>
+        </div>
+
+        <div class="legend">
+            <h3>Piece Reference</h3>
+            <div class="legend-grid">
+                <div class="legend-item"><img class="legend-img" src="/images/pieces/wC.svg" alt="Pyramid" /> Pyramid — cannot move or be captured (0 pts)</div>
+                <div class="legend-item"><img class="legend-img" src="/images/pieces/wP.svg" alt="Pawn" /> Pawn — 1 forward, captures diagonally (2 pts)</div>
+                <div class="legend-item"><img class="legend-img" src="/images/pieces/wB.svg" alt="Bishop" /> Bishop — diagonal slides (3 pts)</div>
+                <div class="legend-item"><img class="legend-img" src="/images/pieces/wN.svg" alt="Knight" /> Knight — L-shaped jumps (4 pts)</div>
+                <div class="legend-item"><img class="legend-img" src="/images/pieces/wR.svg" alt="Rook" /> Rook — straight slides (5 pts)</div>
+                <div class="legend-item"><img class="legend-img" src="/images/pieces/wQ.svg" alt="Queen" /> Queen — any direction, backstab vulnerability! (6 pts)</div>
+            </div>
+        </div>
+
+        @if (_phase == TurnPhase.Rotate && _selectedSquare != null && !_isGameOver)
+        {
+            var (sr, sc) = _selectedSquare.Value;
+            var selectedPiece = GetPiece(sr, sc);
+            if (selectedPiece != null)
+            {
+                <div class="rotate-controls">
+                    <span class="rotate-label">Rotate <img class="rotate-label-img" src="@selectedPiece.ImagePath" alt="@selectedPiece.Type" /> <strong>@selectedPiece.Type</strong>:</span>
+                    <button class="rotate-btn up" disabled="@(!selectedPiece.CanRotateUp || !IsMyTurn)" @onclick="OnRotateUp">
+                        ⬆️ Up to @RotateUpName(selectedPiece)
+                    </button>
+                    <button class="rotate-btn down" disabled="@(!selectedPiece.CanRotateDown || !IsMyTurn)" @onclick="OnRotateDown">
+                        ⬇️ Down to @RotateDownName(selectedPiece)
+                    </button>
+                    <button class="rotate-btn cancel" @onclick="CancelRotateSelection">✖ Different piece</button>
+                </div>
+            }
+        }
+
+        <p class="instructions">
+            <strong>Each turn:</strong> Move a piece, then rotate a <em>different</em> piece one step up or down &bull;
+            <strong>Backstab:</strong> A Queen is captured if an enemy moves directly behind her &bull;
+            <strong>Game ends</strong> when a player has 1 piece left or cannot move
+        </p>
+    }
 </div>
 
 @code {
-    private ProteusChessGame _game = null!;
+    // --- Connection & room state ---
+    private HubConnection? _hub;
+    private bool _isMultiplayer;
+    private bool _inRoom;
+    private bool _roomFull;
+    private string _roomCode = "";
+    private string _joinCode = "";
+    private string _lobbyMessage = "";
+    private PlayerColor? _myColor;
 
-    protected override void OnInitialized()
+    // --- Local game (for non-multiplayer) ---
+    private ProteusChessGame? _localGame;
+
+    // --- Shared display state (used in multiplayer; synced from _localGame in local mode) ---
+    private PieceDto?[][] _board = CreateEmptyBoard();
+    private PlayerColor _currentPlayer = PlayerColor.White;
+    private TurnPhase _phase = TurnPhase.Move;
+    private bool _isGameOver;
+    private string _statusMessage = "White's turn: Move a piece";
+    private int _whiteScore;
+    private int _blackScore;
+    private List<PieceDto> _whiteCaptured = [];
+    private List<PieceDto> _blackCaptured = [];
+    private (int Row, int Col)? _lastMoveFrom;
+    private (int Row, int Col)? _lastMoveTo;
+    private (int Row, int Col)? _movedPieceLocation;
+
+    // --- Local UI selection ---
+    private (int Row, int Col)? _selectedSquare;
+    private (int Row, int Col)? _moveFromSquare;
+    private HashSet<(int Row, int Col)> _validMoveTargets = [];
+
+    private bool IsMyTurn => !_isMultiplayer || _myColor == _currentPlayer;
+
+    private static PieceDto?[][] CreateEmptyBoard()
     {
-        _game = new ProteusChessGame();
+        var board = new PieceDto?[8][];
+        for (int r = 0; r < 8; r++)
+            board[r] = new PieceDto?[8];
+        return board;
     }
 
-    private void NewGame()
+    private PieceDto? GetPiece(int row, int col) => _board[row][col];
+
+    protected override async Task OnInitializedAsync()
     {
-        _game.NewGame();
+        _hub = new HubConnectionBuilder()
+            .WithUrl(Navigation.ToAbsoluteUri("/proteushub"))
+            .WithAutomaticReconnect()
+            .Build();
+
+        _hub.On<GameStateDto>("GameUpdated", dto =>
+        {
+            ApplyDto(dto);
+            InvokeAsync(StateHasChanged);
+        });
+
+        _hub.On<GameStateDto>("PlayerJoined", dto =>
+        {
+            _roomFull = dto.IsFull;
+            ApplyDto(dto);
+            InvokeAsync(StateHasChanged);
+        });
+
+        _hub.On("OpponentDisconnected", () =>
+        {
+            _statusMessage = "Opponent disconnected!";
+            _roomFull = false;
+            InvokeAsync(StateHasChanged);
+        });
+
+        await _hub.StartAsync();
     }
 
-    private void OnSquareClick(int row, int col)
+    // --- Lobby actions ---
+
+    private async Task CreateRoom()
     {
-        _game.OnSquareClick(row, col);
+        if (_hub is null) return;
+        _roomCode = await _hub.InvokeAsync<string>("CreateRoom");
+        _myColor = PlayerColor.White;
+        _isMultiplayer = true;
+        _inRoom = true;
+        _roomFull = false;
+        _lobbyMessage = "";
+        SyncFromLocalGame(new ProteusChessGame());
+    }
+
+    private async Task JoinRoom()
+    {
+        if (_hub is null || string.IsNullOrWhiteSpace(_joinCode)) return;
+        var dto = await _hub.InvokeAsync<GameStateDto?>("JoinRoom", _joinCode.Trim().ToUpperInvariant());
+        if (dto == null)
+        {
+            _lobbyMessage = "Room not found or already full.";
+            return;
+        }
+        _roomCode = dto.RoomCode;
+        _myColor = PlayerColor.Black;
+        _isMultiplayer = true;
+        _inRoom = true;
+        _roomFull = dto.IsFull;
+        ApplyDto(dto);
+    }
+
+    private void StartLocalGame()
+    {
+        _isMultiplayer = false;
+        _inRoom = true;
+        _localGame = new ProteusChessGame();
+        SyncFromLocalGame(_localGame);
+    }
+
+    private void LeaveRoom()
+    {
+        _inRoom = false;
+        _isMultiplayer = false;
+        _localGame = null;
+        _roomCode = "";
+        _roomFull = false;
+        _selectedSquare = null;
+        _moveFromSquare = null;
+    }
+
+    // --- Game actions ---
+
+    private async Task OnSquareClick(int row, int col)
+    {
+        if (_isGameOver) return;
+
+        if (!_isMultiplayer)
+        {
+            HandleLocalClick(row, col);
+            return;
         }
 
-    private void OnRotateUp()
-    {
-        _game.RotateSelectedUp();
+        if (!IsMyTurn) return;
+
+        if (_phase == TurnPhase.Move)
+            await HandleMultiplayerMoveClick(row, col);
+        else
+            HandleMultiplayerRotateClick(row, col);
     }
 
-    private void OnRotateDown()
+    private void HandleLocalClick(int row, int col)
     {
-        _game.RotateSelectedDown();
+        if (_localGame is null) return;
+        _localGame.OnSquareClick(row, col);
+        _selectedSquare = _localGame.SelectedSquare;
+        SyncFromLocalGame(_localGame);
+    }
+
+    private async Task HandleMultiplayerMoveClick(int row, int col)
+    {
+        var piece = GetPiece(row, col);
+
+        if (_moveFromSquare == null)
+        {
+            if (piece != null && piece.Owner == _myColor && piece.Type != PieceType.Pyramid)
+            {
+                _moveFromSquare = (row, col);
+                _selectedSquare = (row, col);
+                await FetchValidMoves(row, col);
+            }
+            return;
+        }
+
+        var (sr, sc) = _moveFromSquare.Value;
+
+        if (sr == row && sc == col)
+        {
+            _moveFromSquare = null;
+            _selectedSquare = null;
+            _validMoveTargets = [];
+            return;
+        }
+
+        if (piece != null && piece.Owner == _myColor && piece.Type != PieceType.Pyramid)
+        {
+            _moveFromSquare = (row, col);
+            _selectedSquare = (row, col);
+            await FetchValidMoves(row, col);
+            return;
+        }
+
+        if (_hub is not null)
+        {
+            var dto = await _hub.InvokeAsync<GameStateDto?>("MakeMove", _roomCode, sr, sc, row, col);
+            if (dto != null)
+                ApplyDto(dto);
+        }
+
+        _moveFromSquare = null;
+        _selectedSquare = null;
+        _validMoveTargets = [];
+    }
+
+    private async Task FetchValidMoves(int row, int col)
+    {
+        _validMoveTargets = [];
+        if (_hub is not null)
+        {
+            var moves = await _hub.InvokeAsync<int[][]?>("GetValidMoves", _roomCode, row, col);
+            if (moves != null)
+            {
+                _validMoveTargets = moves.Select(m => (m[0], m[1])).ToHashSet();
+            }
+        }
+    }
+
+    private void HandleMultiplayerRotateClick(int row, int col)
+    {
+        var piece = GetPiece(row, col);
+        if (piece == null || piece.Owner != _myColor) return;
+        if (_movedPieceLocation is var (mr, mc) && mr == row && mc == col) return;
+
+        if (_selectedSquare == null)
+        {
+            if (piece.CanRotateUp || piece.CanRotateDown)
+                _selectedSquare = (row, col);
+            return;
+        }
+
+        var (sr, sc) = _selectedSquare.Value;
+        if (sr == row && sc == col)
+        {
+            _selectedSquare = null;
+            return;
+        }
+
+        if (piece.CanRotateUp || piece.CanRotateDown)
+            _selectedSquare = (row, col);
+    }
+
+    private async Task OnRotateUp()
+    {
+        if (_selectedSquare == null) return;
+        var (r, c) = _selectedSquare.Value;
+
+        if (!_isMultiplayer)
+        {
+            _localGame?.RotateSelectedUp();
+            _selectedSquare = _localGame?.SelectedSquare;
+            if (_localGame != null) SyncFromLocalGame(_localGame);
+            return;
+        }
+
+        if (_hub is not null)
+        {
+            var dto = await _hub.InvokeAsync<GameStateDto?>("Rotate", _roomCode, r, c, true);
+            if (dto != null) ApplyDto(dto);
+        }
+        _selectedSquare = null;
+    }
+
+    private async Task OnRotateDown()
+    {
+        if (_selectedSquare == null) return;
+        var (r, c) = _selectedSquare.Value;
+
+        if (!_isMultiplayer)
+        {
+            _localGame?.RotateSelectedDown();
+            _selectedSquare = _localGame?.SelectedSquare;
+            if (_localGame != null) SyncFromLocalGame(_localGame);
+            return;
+        }
+
+        if (_hub is not null)
+        {
+            var dto = await _hub.InvokeAsync<GameStateDto?>("Rotate", _roomCode, r, c, false);
+            if (dto != null) ApplyDto(dto);
+        }
+        _selectedSquare = null;
+    }
+
+    private async Task NewGame()
+    {
+        if (!_isMultiplayer)
+        {
+            _localGame?.NewGame();
+            _selectedSquare = null;
+            if (_localGame != null) SyncFromLocalGame(_localGame);
+            return;
+        }
+
+        if (_hub is not null)
+        {
+            var dto = await _hub.InvokeAsync<GameStateDto?>("RequestNewGame", _roomCode);
+            if (dto != null) ApplyDto(dto);
+        }
+        _selectedSquare = null;
     }
 
     private void CancelRotateSelection()
     {
-        _game.SelectedSquare = null;
+        _selectedSquare = null;
     }
+
+    // --- State sync helpers ---
+
+    private void ApplyDto(GameStateDto dto)
+    {
+        _board = dto.Board;
+        _currentPlayer = dto.CurrentPlayer;
+        _phase = dto.Phase;
+        _isGameOver = dto.IsGameOver;
+        _statusMessage = dto.StatusMessage;
+        _whiteScore = dto.WhiteScore;
+        _blackScore = dto.BlackScore;
+        _whiteCaptured = dto.WhiteCaptured;
+        _blackCaptured = dto.BlackCaptured;
+        _lastMoveFrom = dto.LastMoveFrom is [var fr, var fc] ? (fr, fc) : null;
+        _lastMoveTo = dto.LastMoveTo is [var tr, var tc] ? (tr, tc) : null;
+        _movedPieceLocation = dto.MovedPieceLocation is [var mr2, var mc2] ? (mr2, mc2) : null;
+        _roomFull = dto.IsFull;
+        _selectedSquare = null;
+        _moveFromSquare = null;
+        _validMoveTargets = [];
+    }
+
+    private void SyncFromLocalGame(ProteusChessGame game)
+    {
+        for (int r = 0; r < 8; r++)
+            for (int c = 0; c < 8; c++)
+            {
+                var p = game.Board[r, c];
+                _board[r][c] = p != null
+                    ? new PieceDto(p.Owner, p.Type, p.PointValue, p.ImagePath, p.CanRotateUp, p.CanRotateDown)
+                    : null;
+            }
+        _currentPlayer = game.CurrentPlayer;
+        _phase = game.Phase;
+        _isGameOver = game.IsGameOver;
+        _statusMessage = game.StatusMessage;
+        _whiteScore = game.WhiteScore;
+        _blackScore = game.BlackScore;
+        _whiteCaptured = game.WhiteCaptured.Select(p => new PieceDto(p.Owner, p.Type, p.PointValue, p.ImagePath, p.CanRotateUp, p.CanRotateDown)).ToList();
+        _blackCaptured = game.BlackCaptured.Select(p => new PieceDto(p.Owner, p.Type, p.PointValue, p.ImagePath, p.CanRotateUp, p.CanRotateDown)).ToList();
+        _lastMoveFrom = game.LastMoveFrom;
+        _lastMoveTo = game.LastMoveTo;
+        _movedPieceLocation = game.LastMoveTo;
+    }
+
+    // --- UI helpers ---
 
     private string GetSquareExtraClass(int row, int col)
     {
         var classes = new List<string>();
 
-        if (_game.SelectedSquare is var (sr, sc) && sr == row && sc == col)
+        if (_selectedSquare is var (sr, sc) && sr == row && sc == col)
             classes.Add("selected");
 
-        if (_game.IsValidMoveTarget(row, col))
+        if (IsValidMoveTarget(row, col))
             classes.Add("valid-target");
 
-        if (_game.IsRotateCandidate(row, col) && _game.SelectedSquare == null)
+        if (IsRotateCandidate(row, col) && _selectedSquare == null)
             classes.Add("rotate-candidate");
 
-        if (_game.LastMoveFrom is var (fr, fc) && fr == row && fc == col)
+        if (_lastMoveFrom is var (fr, fc) && fr == row && fc == col)
             classes.Add("last-from");
 
-        if (_game.LastMoveTo is var (tr, tc) && tr == row && tc == col)
+        if (_lastMoveTo is var (tr, tc) && tr == row && tc == col)
             classes.Add("last-to");
 
         return string.Join(" ", classes);
     }
 
-    private string PieceClass(Piece piece) =>
-        piece.Owner == PlayerColor.White ? "white-piece" : "black-piece";
+    private bool IsValidMoveTarget(int row, int col)
+    {
+        if (_phase != TurnPhase.Move || _selectedSquare == null) return false;
 
-    private string StatusClass =>
-        _game.IsGameOver ? "game-over" : "";
+        if (!_isMultiplayer && _localGame != null)
+        {
+            var (sr, sc) = _selectedSquare.Value;
+            return _localGame.IsValidMove(sr, sc, row, col);
+        }
 
-    private string SquareTooltip(int row, int col, Piece? piece)
+        if (_isMultiplayer)
+        {
+            return _validMoveTargets.Contains((row, col));
+        }
+
+        return false;
+    }
+
+    private bool IsRotateCandidate(int row, int col)
+    {
+        if (_phase != TurnPhase.Rotate) return false;
+        var p = GetPiece(row, col);
+        if (p == null || p.Owner != _currentPlayer) return false;
+        if (_movedPieceLocation is var (mr, mc) && mr == row && mc == col) return false;
+        return p.CanRotateUp || p.CanRotateDown;
+    }
+
+    private string StatusClass => _isGameOver ? "game-over" : "";
+
+    private string SquareTooltip(int row, int col, PieceDto? piece)
     {
         var coord = $"{"abcdefgh"[col]}{row + 1}";
         if (piece == null) return coord;
         return $"{coord}: {piece.Owner} {piece.Type} ({piece.PointValue} pts)";
     }
 
-    private string RotateUpName(Piece piece) =>
+    private static string RotateUpName(PieceDto piece) =>
         piece.CanRotateUp ? ((PieceType)((int)piece.Type + 1)).ToString() : "—";
 
-    private string RotateDownName(Piece piece) =>
+    private static string RotateDownName(PieceDto piece) =>
         piece.CanRotateDown ? ((PieceType)((int)piece.Type - 1)).ToString() : "—";
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_hub is not null)
+            await _hub.DisposeAsync();
+    }
 }
